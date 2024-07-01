@@ -5,11 +5,23 @@ import logging
 from typing import List, Dict, Tuple, Optional, Any
 
 from langchain_openai import OpenAIEmbeddings
+from langchain_openai import AzureOpenAIEmbeddings
+import os
 
 from runner.database_manager import DatabaseManager
 from pipeline.utils import node_decorator, get_last_node_result
 
 EMBEDDING_FUNCTION = OpenAIEmbeddings(model="text-embedding-3-small")
+
+if os.environ.get("AZURE_OPENAI_API_KEY", None) is not None:
+    EMBEDDING_FUNCTION = AzureOpenAIEmbeddings(
+        openai_api_key=os.environ.get("AZURE_OPENAI_EMBEDDING_API_KEY", None),
+        azure_endpoint=os.environ.get("AZURE_OPENAI_EMBEDDING_ENDPOINT", None),
+        azure_deployment=os.environ.get(
+            "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", None),
+        openai_api_version="2023-05-15",
+    )
+
 
 @node_decorator(check_schema_status=False)
 def entity_retrieval(task: Any, tentative_schema: Dict[str, Any], execution_history: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -25,11 +37,13 @@ def entity_retrieval(task: Any, tentative_schema: Dict[str, Any], execution_hist
         Dict[str, Any]: A dictionary containing similar columns and values.
     """
     logging.info("Starting entity retrieval")
-    keywords = get_last_node_result(execution_history, "keyword_extraction")["keywords"]
-    
-    similar_columns = get_similar_columns(keywords=keywords, question=task.question, hint=task.evidence)
+    keywords = get_last_node_result(
+        execution_history, "keyword_extraction")["keywords"]
+
+    similar_columns = get_similar_columns(
+        keywords=keywords, question=task.question, hint=task.evidence)
     result = {"similar_columns": similar_columns}
-    
+
     similar_values = get_similar_entities(keywords=keywords)
     result["similar_values"] = similar_values
 
@@ -37,6 +51,7 @@ def entity_retrieval(task: Any, tentative_schema: Dict[str, Any], execution_hist
     return result
 
 ### Column name similarity ###
+
 
 def get_similar_columns(keywords: List[str], question: str, hint: str) -> Dict[str, List[str]]:
     """
@@ -53,10 +68,12 @@ def get_similar_columns(keywords: List[str], question: str, hint: str) -> Dict[s
     logging.info("Retrieving similar columns")
     selected_columns = {}
     for keyword in keywords:
-        similar_columns = _get_similar_column_names(keyword=keyword, question=question, hint=hint)
+        similar_columns = _get_similar_column_names(
+            keyword=keyword, question=question, hint=hint)
         for table_name, column_name in similar_columns:
             selected_columns.setdefault(table_name, []).append(column_name)
     return selected_columns
+
 
 def _column_value(string: str) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -71,9 +88,11 @@ def _column_value(string: str) -> Tuple[Optional[str], Optional[str]]:
     if "=" in string:
         left_equal = string.find("=")
         first_part = string[:left_equal].strip()
-        second_part = string[left_equal + 1:].strip() if len(string) > left_equal + 1 else None
+        second_part = string[left_equal +
+                             1:].strip() if len(string) > left_equal + 1 else None
         return first_part, second_part
     return None, None
+
 
 def _extract_paranthesis(string: str) -> List[str]:
     """
@@ -97,6 +116,7 @@ def _extract_paranthesis(string: str) -> List[str]:
                 paranthesis_matches.append(found_string)
     return paranthesis_matches
 
+
 def _does_keyword_match_column(keyword: str, column_name: str, threshold: float = 0.9) -> bool:
     """
     Checks if a keyword matches a column name based on similarity.
@@ -113,6 +133,7 @@ def _does_keyword_match_column(keyword: str, column_name: str, threshold: float 
     column_name = column_name.lower().replace(" ", "").replace("_", "").rstrip("s")
     similarity = difflib.SequenceMatcher(None, column_name, keyword).ratio()
     return similarity >= threshold
+
 
 def _get_similar_column_names(keyword: str, question: str, hint: str) -> List[Tuple[str, str]]:
     """
@@ -145,13 +166,16 @@ def _get_similar_column_names(keyword: str, question: str, hint: str) -> List[Tu
         for column in columns:
             for potential_column_name in potential_column_names:
                 if _does_keyword_match_column(potential_column_name, column):
-                    similarity_score = _get_semantic_similarity_with_openai(f"`{table}`.`{column}`", [f"{question} {hint}"])[0]
-                    similar_column_names.append((table, column, similarity_score))
+                    similarity_score = _get_semantic_similarity_with_openai(
+                        f"`{table}`.`{column}`", [f"{question} {hint}"])[0]
+                    similar_column_names.append(
+                        (table, column, similarity_score))
 
     similar_column_names.sort(key=lambda x: x[2], reverse=True)
     return [(table, column) for table, column, _ in similar_column_names[:1]]
 
 ### Entity similarity ###
+
 
 def get_similar_entities(keywords: List[str]) -> Dict[str, Dict[str, List[str]]]:
     """
@@ -167,7 +191,8 @@ def get_similar_entities(keywords: List[str]) -> Dict[str, Dict[str, List[str]]]
     selected_values = {}
 
     def get_similar_values_target_string(target_string: str):
-        unique_similar_values = DatabaseManager().query_lsh(keyword=target_string, signature_size=100, top_n=10)
+        unique_similar_values = DatabaseManager().query_lsh(
+            keyword=target_string, signature_size=100, top_n=10)
         return target_string, _get_similar_entities_to_keyword(target_string, unique_similar_values)
 
     for keyword in keywords:
@@ -187,16 +212,18 @@ def get_similar_entities(keywords: List[str]) -> Dict[str, Dict[str, List[str]]]
         hint_column, hint_value = _column_value(keyword)
         if hint_value:
             to_search_values = [hint_value, *to_search_values]
-        
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {executor.submit(get_similar_values_target_string, ts): ts for ts in to_search_values}
+            futures = {executor.submit(
+                get_similar_values_target_string, ts): ts for ts in to_search_values}
             for future in concurrent.futures.as_completed(futures):
                 target_string, similar_values = future.result()
                 for table_name, column_values in similar_values.items():
                     for column_name, entities in column_values.items():
                         if entities:
                             selected_values.setdefault(table_name, {}).setdefault(column_name, []).extend(
-                                [(ts, value, edit_distance, embedding) for ts, value, edit_distance, embedding in entities]
+                                [(ts, value, edit_distance, embedding)
+                                 for ts, value, edit_distance, embedding in entities]
                             )
 
     for table_name, column_values in selected_values.items():
@@ -206,6 +233,7 @@ def get_similar_entities(keywords: List[str]) -> Dict[str, Dict[str, List[str]]]
                 value for _, value, edit_distance, _ in values if edit_distance == max_edit_distance
             ))
     return selected_values
+
 
 def _get_similar_entities_to_keyword(keyword: str, unique_values: Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, List[Tuple[str, str, float, float]]]]:
     """
@@ -226,6 +254,7 @@ def _get_similar_entities_to_keyword(keyword: str, unique_values: Dict[str, Dict
         for table_name, column_values in unique_values.items()
     }
 
+
 def _get_similar_values(target_string: str, values: List[str]) -> List[Tuple[str, str, float, float]]:
     """
     Finds values similar to the target string based on edit distance and embedding similarity.
@@ -243,21 +272,25 @@ def _get_similar_values(target_string: str, values: List[str]) -> List[Tuple[str
     top_k_embedding = 1
 
     edit_distance_similar_values = [
-        (value, difflib.SequenceMatcher(None, value.lower(), target_string.lower()).ratio())
+        (value, difflib.SequenceMatcher(
+            None, value.lower(), target_string.lower()).ratio())
         for value in values
         if difflib.SequenceMatcher(None, value.lower(), target_string.lower()).ratio() >= edit_distance_threshold
     ]
     edit_distance_similar_values.sort(key=lambda x: x[1], reverse=True)
     edit_distance_similar_values = edit_distance_similar_values[:top_k_edit_distance]
-    similarities = _get_semantic_similarity_with_openai(target_string, [value for value, _ in edit_distance_similar_values])
+    similarities = _get_semantic_similarity_with_openai(
+        target_string, [value for value, _ in edit_distance_similar_values])
     embedding_similar_values = [
-        (target_string, edit_distance_similar_values[i][0], edit_distance_similar_values[i][1], similarities[i])
+        (target_string, edit_distance_similar_values[i][0],
+         edit_distance_similar_values[i][1], similarities[i])
         for i in range(len(edit_distance_similar_values))
         if similarities[i] >= embedding_similarity_threshold
     ]
 
     embedding_similar_values.sort(key=lambda x: x[2], reverse=True)
     return embedding_similar_values[:top_k_embedding]
+
 
 def _get_semantic_similarity_with_openai(target_string: str, list_of_similar_words: List[str]) -> List[float]:
     """
@@ -270,7 +303,10 @@ def _get_semantic_similarity_with_openai(target_string: str, list_of_similar_wor
     Returns:
         List[float]: A list of similarity scores.
     """
+    # print(
+    #     f"_get_semantic_similarity_with_openai:\n{target_string}\n{list_of_similar_words}")
     target_string_embedding = EMBEDDING_FUNCTION.embed_query(target_string)
     all_embeddings = EMBEDDING_FUNCTION.embed_documents(list_of_similar_words)
-    similarities = [np.dot(target_string_embedding, embedding) for embedding in all_embeddings]
+    similarities = [np.dot(target_string_embedding, embedding)
+                    for embedding in all_embeddings]
     return similarities

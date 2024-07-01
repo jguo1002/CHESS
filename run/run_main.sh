@@ -37,10 +37,11 @@ engine7='meta-llama/Meta-Llama-3-70B-Instruct'
 engine8='finetuned_colsel'
 engine9='finetuned_col_filter'
 engine10='gpt-3.5-turbo-instruct'
+engine11='azure-gpt-4o'
 
 pipeline_setup='{
     "keyword_extraction": {
-        "engine": "'${engine2}'",
+        "engine": "'${engine11}'",
         "temperature": 0.2,
         "base_uri": ""
     },
@@ -52,32 +53,32 @@ pipeline_setup='{
         "top_k": '${top_k}'
     },
     "column_filtering": {
-        "engine": "'${engine2}'",
+        "engine": "'${engine11}'",
         "temperature": 0.0,
         "base_uri": ""
     },
     "table_selection": {
         "mode": "'${table_selection_mode}'",
-        "engine": "'${engine3}'",
+        "engine": "'${engine11}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
     },
     "column_selection": {
         "mode": "'${column_selection_mode}'",
-        "engine": "'${engine3}'",
+        "engine": "'${engine11}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
     },
     "candidate_generation": {
-        "engine": "'${engine3}'",
+        "engine": "'${engine11}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
     },
     "revision": {
-        "engine": "'${engine3}'",
+        "engine": "'${engine11}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
@@ -85,7 +86,7 @@ pipeline_setup='{
 }'
 
 echo -e "${run_name}"
-python3 -u ./src_new/main.py --data_mode ${data_mode} --data_path ${data_path}\
+python3 -u ./src/main.py --data_mode ${data_mode} --data_path ${data_path}\
         --pipeline_nodes ${pipeline_nodes} --pipeline_setup "$pipeline_setup"\
         # --use_checkpoint --checkpoint_nodes ${checkpoint_nodes} --checkpoint_dir ${checkpoint_dir}
   

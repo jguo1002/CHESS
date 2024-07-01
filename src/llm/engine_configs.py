@@ -1,6 +1,7 @@
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_anthropic import ChatAnthropic
+from langchain_community.chat_models import ChatOllama
 from typing import Dict, Any
 
 """
@@ -39,6 +40,10 @@ ENGINE_CONFIGS: Dict[str, Dict[str, Any]] = {
         "constructor": ChatOpenAI,
         "params": {"model": "gpt-4-turbo", "temperature": 0}
     },
+    "azure-gpt-4o": {
+        "constructor": AzureChatOpenAI,
+        "params": {"deployment_name": "gpt-4o", "temperature": 0}
+    },
     "claude-3-opus-20240229": {
         "constructor": ChatAnthropic,
         "params": {"model": "claude-3-opus-20240229", "temperature": 0}
@@ -57,9 +62,9 @@ ENGINE_CONFIGS: Dict[str, Dict[str, Any]] = {
         }
     },
     "meta-llama/Meta-Llama-3-70B-Instruct": {
-        "constructor": ChatOpenAI,
+        "constructor": ChatOllama,
         "params": {
-            "model": "meta-llama/Meta-Llama-3-70B-Instruct",
+            "model": "llama3",
             "openai_api_key": "EMPTY",
             "openai_api_base": "/v1",
             "max_tokens": 600,
