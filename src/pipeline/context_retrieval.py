@@ -4,6 +4,8 @@ from typing import Dict, List, Any
 from runner.database_manager import DatabaseManager
 from pipeline.utils import node_decorator, get_last_node_result
 from pipeline.pipeline_manager import PipelineManager
+import time
+
 
 @node_decorator(check_schema_status=False)
 def context_retrieval(task: Any, tentative_schema: Dict[str, Any], execution_history: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -19,24 +21,27 @@ def context_retrieval(task: Any, tentative_schema: Dict[str, Any], execution_his
         Dict[str, Any]: A dictionary containing the schema with descriptions.
     """
     logging.info("Starting context retrieval")
-    
-    keywords = get_last_node_result(execution_history, "keyword_extraction")["keywords"]
+
+    keywords = get_last_node_result(
+        execution_history, "keyword_extraction")["keywords"]
     top_k = PipelineManager().context_retrieval["top_k"]
-    
+
     retrieved_columns = _find_most_similar_columns(
         question=task.question,
         evidence=task.evidence,
         keywords=keywords,
         top_k=top_k
     )
-    
-    schema_with_descriptions = _format_retrieved_descriptions(retrieved_columns)
+
+    schema_with_descriptions = _format_retrieved_descriptions(
+        retrieved_columns)
     result = {"schema_with_descriptions": schema_with_descriptions}
-    
+
     logging.info("Context retrieval completed successfully")
     return result
 
 ### Context similarity ###
+
 
 def _find_most_similar_columns(question: str, evidence: str, keywords: List[str], top_k: int) -> Dict[str, Dict[str, Dict[str, str]]]:
     """
@@ -53,20 +58,28 @@ def _find_most_similar_columns(question: str, evidence: str, keywords: List[str]
     """
     logging.info("Finding the most similar columns")
     tables_with_descriptions = {}
-    
+
     for keyword in keywords:
         question_based_query = f"{question} {keyword}"
         evidence_based_query = f"{evidence} {keyword}"
-        
-        retrieved_question_based_query = DatabaseManager().query_vector_db(question_based_query, top_k=top_k)
-        retrieved_evidence_based_query = DatabaseManager().query_vector_db(evidence_based_query, top_k=top_k)
-        
-        tables_with_descriptions = _add_description(tables_with_descriptions, retrieved_question_based_query)
-        tables_with_descriptions = _add_description(tables_with_descriptions, retrieved_evidence_based_query)
-    
+
+        retrieved_question_based_query = DatabaseManager(
+        ).query_vector_db(question_based_query, top_k=top_k)
+        # GUJ1SYV: add a time.sleep(1) to avoid quota limit
+        # print(f"querying vector_db...")
+        time.sleep(1)
+        retrieved_evidence_based_query = DatabaseManager(
+        ).query_vector_db(evidence_based_query, top_k=top_k)
+
+        tables_with_descriptions = _add_description(
+            tables_with_descriptions, retrieved_question_based_query)
+        tables_with_descriptions = _add_description(
+            tables_with_descriptions, retrieved_evidence_based_query)
+
     return tables_with_descriptions
 
-def _add_description(tables_with_descriptions: Dict[str, Dict[str, Dict[str, str]]], 
+
+def _add_description(tables_with_descriptions: Dict[str, Dict[str, Dict[str, str]]],
                      retrieved_descriptions: Dict[str, Dict[str, Dict[str, str]]]) -> Dict[str, Dict[str, Dict[str, str]]]:
     """
     Adds descriptions to tables from retrieved descriptions.
@@ -83,10 +96,11 @@ def _add_description(tables_with_descriptions: Dict[str, Dict[str, Dict[str, str
         if table_name not in tables_with_descriptions:
             tables_with_descriptions[table_name] = {}
         for column_name, description in column_descriptions.items():
-            if (column_name not in tables_with_descriptions[table_name] or 
-                description["score"] > tables_with_descriptions[table_name][column_name]["score"]):
+            if (column_name not in tables_with_descriptions[table_name] or
+                    description["score"] > tables_with_descriptions[table_name][column_name]["score"]):
                 tables_with_descriptions[table_name][column_name] = description
     return tables_with_descriptions
+
 
 def _format_retrieved_descriptions(retrieved_columns: Dict[str, Dict[str, Dict[str, str]]]) -> Dict[str, Dict[str, Dict[str, str]]]:
     """

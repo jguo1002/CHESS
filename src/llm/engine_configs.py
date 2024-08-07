@@ -64,7 +64,7 @@ ENGINE_CONFIGS: Dict[str, Dict[str, Any]] = {
     "meta-llama/Meta-Llama-3-70B-Instruct": {
         "constructor": ChatOllama,
         "params": {
-            "model": "llama3",
+            "model": "llama3:70b",
             "openai_api_key": "EMPTY",
             "openai_api_base": "/v1",
             "max_tokens": 600,

@@ -1,6 +1,6 @@
 data_mode='dev' # Options: 'dev', 'train' 
 
-data_path="./data/dev/dev.json" # UPDATE THIS WITH THE PATH TO THE TARGET DATASET
+data_path="./data/bird/dev/dev_152_seed_42.json" # UPDATE THIS WITH THE PATH TO THE TARGET DATASET
 
 pipeline_nodes='keyword_extraction+entity_retrieval+context_retrieval+column_filtering+table_selection+column_selection+candidate_generation+revision+evaluation'
 checkpoint_nodes=''
@@ -41,7 +41,7 @@ engine11='azure-gpt-4o'
 
 pipeline_setup='{
     "keyword_extraction": {
-        "engine": "'${engine11}'",
+        "engine": "'${engine7}'",
         "temperature": 0.2,
         "base_uri": ""
     },
@@ -53,32 +53,32 @@ pipeline_setup='{
         "top_k": '${top_k}'
     },
     "column_filtering": {
-        "engine": "'${engine11}'",
+        "engine": "'${engine7}'",
         "temperature": 0.0,
         "base_uri": ""
     },
     "table_selection": {
         "mode": "'${table_selection_mode}'",
-        "engine": "'${engine11}'",
+        "engine": "'${engine7}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
     },
     "column_selection": {
         "mode": "'${column_selection_mode}'",
-        "engine": "'${engine11}'",
+        "engine": "'${engine7}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
     },
     "candidate_generation": {
-        "engine": "'${engine11}'",
+        "engine": "'${engine7}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
     },
     "revision": {
-        "engine": "'${engine11}'",
+        "engine": "'${engine7}'",
         "temperature": 0.0,
         "base_uri": "",
         "sampling_count": 1
